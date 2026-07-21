@@ -67,25 +67,36 @@ export default function Page() {
 
 # Pages
 
-Every feature/page should be placed inside the `src/pages` directory.
+Every feature/page should be placed inside the `src/pages` directory, organized by authentication state.
 
-Example:
+## Directory Structure
 
 ```
 pages/
-└── Login/
-    ├── index.js
-    ├── components/
-    └── hooks/
+├── Authenticated/          # Protected pages/components (require auth)
+│   ├── Dashboard/
+│   │   ├── index.js
+│   │   ├── components/
+│   │   └── hooks/
+│   └── ...
+│
+└── Unauthenticated/        # Public pages/components (no auth required)
+    ├── Login/
+    │   ├── index.js
+    │   ├── components/
+    │   └── hooks/
+    └── ...
 ```
 
 ### Responsibilities
 
-- `index.js` → Main page component.
+- `index.js` → Main page/component file.
 - `components/` → Components used only by the page.
 - `hooks/` → Custom hooks used only by the page.
+- Place authenticated features in `Authenticated/` folder.
+- Place public features in `Unauthenticated/` folder.
 
-If the page is simple, don't create unnecessary folders.
+If a feature is simple, don't create unnecessary subfolders.
 
 ---
 
