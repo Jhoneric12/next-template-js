@@ -91,39 +91,168 @@ If the page is simple, don't create unnecessary folders.
 
 # Services
 
-All API requests belong inside the root `src/services` directory.
+All API requests belong inside the root `src/services` directory in a strict two-layer architecture.
 
-Never place API requests inside page folders or React components.
+**CRITICAL RULE**: Never place API requests inside page folders, components, or anywhere else. Services are the ONLY place for API logic.
 
-Example:
+## Directory Structure
 
 ```
-src/
-└── services/
-    ├── auth/
-    │   ├── api.js
-    │   └── query.js
-    ├── user/
-    │   ├── api.js
-    │   └── query.js
+src/services/
+├── api/                    # HTTP Request Layer (Axios only)
+│   ├── auth.js            # Pure HTTP functions: login, logout, getUser
+│   ├── products.js        # Pure HTTP functions: getProducts, createProduct
+│   └── ...
+│
+└── query/                  # Query/Mutation Layer (TanStack Query only)
+    ├── useAuth.js         # Hooks: useLogin, useLogout, useGetUser
+    ├── useProducts.js     # Hooks: useGetProducts, useCreateProduct
     └── ...
 ```
 
-- `api.js` → Axios request functions.
-- `requests.js` → TanStack Query hooks.
+## Two-Layer Architecture
 
-Components should only use TanStack Query hooks.
+### Layer 1: `services/api/` - HTTP Requests (Axios)
 
-Flow:
+**Responsibility**: Pure HTTP request functions using Axios.
+
+**Rules**:
+
+- Only Axios calls, no React/hooks
+- Export plain functions, not hooks
+- Name functions like: `fetchUser()`, `loginUser()`, `createProduct()`
+- Handle only HTTP errors, no UI logic
+- Pure data transformation if needed
+- Always return raw response data
+
+**Example - `services/api/auth.js`**:
+
+```javascript
+import axios from "@/lib/axios";
+
+export const loginUser = async (credentials) => {
+  const { data } = await axios.post("/auth/login", credentials);
+  return data;
+};
+
+export const getUser = async () => {
+  const { data } = await axios.get("/auth/user");
+  return data;
+};
+
+export const logoutUser = async () => {
+  await axios.post("/auth/logout");
+};
+```
+
+### Layer 2: `services/query/` - TanStack Query (React Hooks)
+
+**Responsibility**: Wrap HTTP functions with TanStack Query hooks.
+
+**Rules**:
+
+- Use only exported functions from `services/api/`
+- Export React Query hooks, not functions
+- Name hooks like: `useLogin()`, `useGetUser()`, `useCreateProduct()`
+- Include query/mutation configuration (staleTime, retry, etc.)
+- Handle loading/error/success states
+- Use `onSuccess` and `onError` callbacks for side effects
+- Never call HTTP functions directly in components
+
+**Example - `services/query/useAuth.js`**:
+
+```javascript
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { loginUser, getUser, logoutUser } from "@/services/api/auth";
+
+export const useLogin = () => {
+  return useMutation({
+    mutationFn: loginUser,
+    onSuccess: (data) => {
+      console.log("Login successful:", data);
+    },
+  });
+};
+
+export const useGetUser = () => {
+  return useQuery({
+    queryKey: ["user"],
+    queryFn: getUser,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+};
+
+export const useLogout = () => {
+  return useMutation({
+    mutationFn: logoutUser,
+  });
+};
+```
+
+## The Request Flow
 
 ```
 Component
     ↓
-TanStack Query Hook
+Import: useGetUser() from services/requests/
     ↓
-Axios Service
+TanStack Query Hook executes
+    ↓
+Calls: getUser() from services/api/
+    ↓
+Axios HTTP Request
     ↓
 Backend API
+```
+
+## Component Usage (ONLY)
+
+Components **MUST** only import from `services/query/`:
+
+```javascript
+import { useGetUser, useLogin } from "@/services/query/useAuth";
+
+export const UserProfile = () => {
+  const { data: user, isLoading } = useGetUser();
+  const { mutate: login } = useLogin();
+
+  return (
+    // UI here
+  );
+};
+```
+
+## Forbidden Patterns
+
+❌ Direct Axios calls in components:
+
+```javascript
+// WRONG - Never do this
+import axios from "@/lib/axios";
+const { data } = await axios.get("/users");
+```
+
+❌ API functions in components:
+
+```javascript
+// WRONG - Never do this
+export const getUser = async () => { ... };
+// Then import in component
+```
+
+❌ TanStack Query in api/ folder:
+
+```javascript
+// WRONG - Keep api/ pure Axios only
+export const useGetUser = () => useQuery(...);
+```
+
+❌ Multiple features mixed in one file:
+
+```javascript
+// WRONG - Split by domain
+export const getUser = () => {};
+export const getProducts = () => {}; // Use separate file
 ```
 
 ---
@@ -137,8 +266,7 @@ Example:
 ```
 lib/
 └── axios/
-    ├── instance.js
-    ├── interceptors.js
+    ├── interceptor.js
     └── index.js
 ```
 
